@@ -1,6 +1,9 @@
 import React from "react";
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
+import Alert from "@mui/material/Alert";
+import Snackbar from "@mui/material/Snackbar";
+import axios from "axios";
 
 type CSVFileImportProps = {
   url: string;
@@ -9,6 +12,8 @@ type CSVFileImportProps = {
 
 export default function CSVFileImport({ url, title }: CSVFileImportProps) {
   const [file, setFile] = React.useState<File>();
+  const [isError, setIsError] = React.useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = React.useState<string>();
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -18,23 +23,46 @@ export default function CSVFileImport({ url, title }: CSVFileImportProps) {
     }
   };
 
+  const handleClose = (
+    event?: React.SyntheticEvent | Event,
+    reason?: string
+  ) => {
+    if (reason === "clickaway") {
+      return;
+    }
+
+    setIsError(false);
+  };
+
   const removeFile = () => {
     setFile(undefined);
   };
 
   const uploadFile = async () => {
     console.log("uploadFile to", url);
+    const authorizationToken = localStorage.getItem("authorization_token");
+    const authorizationErrorCodes = [401, 403];
+    const name = file?.name || "";
 
-    // Get the presigned URL
-    // const response = await axios({
-    //   method: "GET",
-    //   url,
-    //   params: {
-    //     name: encodeURIComponent(file.name),
-    //   },
-    // });
-    // console.log("File to upload: ", file.name);
-    // console.log("Uploading to: ", response.data);
+    await axios({
+      method: "GET",
+      url,
+      params: {
+        name: encodeURIComponent(name),
+      },
+      headers: {
+        Authorization: `Basic ${authorizationToken}`,
+      },
+    }).catch((error) => {
+      if (authorizationErrorCodes.includes(error.response.status)) {
+        setErrorMessage(
+          error.response.data.Message || error.response.data.message
+        );
+        setIsError(true);
+      }
+    });
+    console.log("File to upload: ", name);
+
     // const result = await fetch(response.data, {
     //   method: "PUT",
     //   body: file,
@@ -55,6 +83,11 @@ export default function CSVFileImport({ url, title }: CSVFileImportProps) {
           <button onClick={uploadFile}>Upload file</button>
         </div>
       )}
+      <Snackbar open={isError} autoHideDuration={6000} onClose={handleClose}>
+        <Alert onClose={handleClose} severity="error" sx={{ width: "100%" }}>
+          {errorMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
